@@ -11,9 +11,56 @@ ct.sendMessage = ct.sendMessage || ct.sendRequest;
 // 配置 Consumer 和系统参数
 Ripple.
 setupConsumer({
-	key: 'c4640921f55d6552ad5d4f7d46813194',
-	secret: '912d175718e5af2ea126b64981927a81'
+	key: 'yN3DUNVO0Me63IAQdhTfCA',
+	secret: 'c768oTKdzAjIYCmpSNIdZbGaG0t6rOhSFQP0S5uC79g'
 });
+function initUrlExpand() {
+	var short_url_services = lscache.get('short_url_services');
+	if (short_url_services) {
+		// 识别更多短链接
+		short_url_services['[a-z0-9]{1,5}\.[a-z]{2,3}'] = true;
+		var re = '^https?:\\/\\/';
+		re += '(?:' + Object.keys(short_url_services).join('|') + ')';
+		re += '\\/\\S+';
+		re = re.replace(/\./g, '\\.');
+		Fanjoy.shortUrlRe = new RegExp(re);
+		return;
+	}
+	Ripple.ajax.get('http://api.longurl.org/v2/services', {
+		params: {
+			format: 'json'
+		},
+		success: function(data) {
+			lscache.set('short_url_services', data);
+			initUrlExpand();
+		},
+		error: function(e) {
+			setTimeout(initUrlExpand, 60000);
+		}
+	});
+}
+
+var cachedShortUrls = { };
+function expandUrl(url) {
+	var d = new Deferred;
+	if (cachedShortUrls[url]) {
+		setTimeout(function() {
+			d.call(cachedShortUrls[url]);
+		});
+	} else {
+		Ripple.ajax.get('http://api.longurl.org/v2/expand', {
+			params: {
+				url: url,
+				format: 'json'
+			}
+		}).next(function(data) {
+			var long_url = data['long-url'];
+			cachedShortUrls[url] = long_url;
+			d.call(long_url);
+		});
+	}
+	return d;
+}
 
 function onMessage(msg, sender, sendResponse) {
 	var tab = sender.tab;
@@ -110,7 +157,7 @@ function disableAll() {
 function applySettings() {
 	executeScript(getSerilizedSettings());
 }
-
+/*
 function updateDetails(mode) {
 	var user = Ripple(Fanjoy.accessToken);
 	var verify = user.verify().next(function(details) {
@@ -123,6 +170,30 @@ function updateDetails(mode) {
 		error(function() {
 			setTimeout(function() {
 				updateDetails(mode);
+			}, 60000);
+		});
+	}
+	return verify;
+}
+*/
+function updateDetails(flag) {
+	if (! Fanjoy.accessToken) return;
+	var user = Ripple(Fanjoy.accessToken);
+	var verify = user.verify().next(function(details) {
+		lscache.set('account_details', details);
+		if (details.friends_count >= 75 && is_first_run) {
+			settings.current.autoFlushCache = true;
+			settings.save();
+		}
+		is_first_run = false;
+		Fanjoy.account = details;
+	});
+	if (flag) {
+		// 延时重试
+		verify.
+		error(function() {
+			setTimeout(function() {
+				updateDetails(flag);
 			}, 60000);
 		});
 	}
@@ -200,7 +271,7 @@ function closeAllPopup() {
 }
 
 function broadcast(callback) {
-	ct.query({ 
+	ct.query({
 		url: [
 			'http://*/*',
 			'https://*/*'
@@ -270,7 +341,6 @@ function initialize() {
 
 		return;
 	}
-
 	var tab_id, tab_port;
 	Ripple.authorize.withPINCode(function(auth_url) {
 		var options = {
@@ -278,10 +348,8 @@ function initialize() {
 			selected: true
 		};
 		var deferred = Deferred();
-
 		// 打开验证页面
 		ct.create(options, function(tab) {
-
 			ct.onUpdated.addListener(function onUpdated(id, info) {
 				// 等待用户点击 '授权' 后跳转至 PIN Code 页面
 				if (id !== tab.id) return;
@@ -289,11 +357,13 @@ function initialize() {
 
 				// 继续验证操作
 				ct.executeScript(id, {
-					file: 'authorize.js'
+					file: 'authorize.js',
+					runAt: 'document_end'
 				}, function() {
 					// 等待页面传送 PIN Code
 					var port = ct.connect(id);
-					port.onMessage.addListener(function listenForPINCode(pin_code) {
+					port.onMessage.addListener(function listenForPINCode(msg) {
+						var pin_code = msg.pinCode;
 						tab_port = port;
 						// 如果页面端没有拿到 PIN Code, 会传送 'rejected' 消息过来
 						deferred[pin_code == 'rejected' ? 'fail' : 'call'](pin_code);
@@ -305,7 +375,7 @@ function initialize() {
 
 				ct.insertCSS(id, {
 					code: '#retry { text-decoration: underline; }' +
-								'#retry:hover { cursor: pointer; }'
+					'#retry:hover { cursor: pointer; }'
 				});
 			});
 
@@ -316,8 +386,10 @@ function initialize() {
 	}).
 	next(function(token) {
 		// 成功拿到 access token
-		tab_port.postMessage('success');
-
+		tab_port.postMessage({
+			type: 'authorize',
+			msg: 'success'
+		});
 		// 把 access token 缓存下来并重启程序
 		lscache.set('access_token', token);
 		Fanjoy.accessToken = token;
@@ -329,7 +401,7 @@ function initialize() {
 		}
 		setTimeout(function() {
 			closeTab(tab_id);
-		}, 5000);
+		}, 2000);
 		lscache.set('is_first_run', false);
 	}).
 	error(function(error) {
@@ -341,7 +413,7 @@ function initialize() {
 			tab_port.postMessage('failure');
 			tab_port.onMessage.addListener(function(msg) {
 				// 等待用户点击 '重试'
-				if (msg === 'retry') {
+				if (msg.type === 'authorize' && msg.msg === 'retry') {
 					closeTab(tab_id);
 					initialize();
 				}
@@ -411,14 +483,10 @@ var settings = {
 	keys: ['page_tit', 'page_url', 'sel', 'img_desc', 'img_tit', 'img_url', 'link_url', 'link_desc', 'link_tit'],
 	current: { }
 };
-
+var is_mac = navigator.platform.indexOf('Mac') > -1;
 var Fanjoy = this.Fanjoy = {
-	version: (function() {
-		var xhr = new XMLHttpRequest;
-		xhr.open('GET', 'manifest.json', false);
-		xhr.send(null);
-		return JSON.parse(xhr.responseText).version;
-	})(),
+	version: chrome.app.getDetails().version,
+	is_mac: is_mac,
 	defaultStyle: {
 		innerWidth: 300,
 		innerHeight: 135,
@@ -449,12 +517,6 @@ var Fanjoy = this.Fanjoy = {
 	setSuccessCount: function() {
 		var count = Fanjoy.getSuccessCount();
 		lscache.set('success_count', ++count);
-	},
-	showLogin: function() {
-		createTab('http://fanfou.com/login');
-	},
-	showExtHomePage: function() {
-		createTab('https://chrome.google.com/webstore/detail/fkabhbjhcdoccohpojphgofmlljekcgg/reviews');
 	},
 	playSound: (function() {
 		var beep = new Audio;

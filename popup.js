@@ -693,7 +693,7 @@ function checkSuccessCount() {
 function switchAccount() {
 	Deferred.next(function() {
 		reset_inner.innerHTML = '<p>正在检查, 请稍等..</p>';
-		return Ripple.ajax.get('http://m.fanfou.com/');
+		return Ripple.ajax.get('https://mobile.twitter.com/');
 	}).
 	next(function(html) {
 		var re = /1<a href="\/([^"]+)"[^>]+accesskey="1">空间<\/a>/i;
@@ -714,7 +714,12 @@ function switchAccount() {
 			}
 			code += '<button id="logoutFF">登出</button>';
 		} else {
-			code = "点击按钮完成账号切换 ";
+			code += '<p>';
+			code += '当前登录账号为 <strong>' + Fanjoy.account.screen_name + '</strong>, ';
+			code += Fanjoy.account.id == Fanjoy.account.id ?
+				'已通过验证.' : '已通过验证账号为 ' + '<strong>' + Fanjoy.account.screen_name + '</strong>.';
+			code += '</p>';
+			code += "点击按钮完成账号切换 ";
 		}
 		if (current_id) {
 			code += current_id != Fanjoy.account.id ?
