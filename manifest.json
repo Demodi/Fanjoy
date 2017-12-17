@@ -19,9 +19,9 @@
 		"16": "images/icon-16.png",
 		"256": "images/icon-256.png"
 	},
-	"name": "\u6709\u996D\u540C\u4EAB",
+	"name": "FanJoy",
 	"permissions": [ "tabs", "contextMenus", "http://*/", "https://*/" ],
 	"content_security_policy": "script-src 'self' 'unsafe-eval'; object-src 'self'",
-	"version": "0.4.0",
+	"version": "0.4.1.1",
 	"manifest_version": 2
 }

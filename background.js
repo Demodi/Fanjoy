@@ -11,9 +11,18 @@ ct.sendMessage = ct.sendMessage || ct.sendRequest;
 // 配置 Consumer 和系统参数
 Ripple.
 setupConsumer({
-	key: 'c4640921f55d6552ad5d4f7d46813194',
-	secret: '912d175718e5af2ea126b64981927a81'
+	key: '714bc3715ab04a147f66d14c183cafbe',
+	secret: '02a2ff7934422b0f9969277c5852aa23'
 });
+
+Ripple.shorten['t.cn'] = function(long_url) {
+	return Ripple.ajax.get('http://api.t.sina.com.cn/short_url/shorten.json', {
+		params: {
+			source: 850454853,
+			url_long: long_url
+		}
+	});
+}
 
 function onMessage(msg, sender, sendResponse) {
 	var tab = sender.tab;
@@ -200,7 +209,7 @@ function closeAllPopup() {
 }
 
 function broadcast(callback) {
-	ct.query({ 
+	ct.query({
 		url: [
 			'http://*/*',
 			'https://*/*'
@@ -383,16 +392,16 @@ function getSerilizedSettings() {
 
 // 上下文菜单细节
 var onContextmenus = {
-	selection: ['有饭同享: %s', function(info, tab) {
+	selection: ['fanjoy: %s', function(info, tab) {
 		return 'shareSelection(true);';
 	}],
-	image: ['有饭同享: 分享图片', function(info, tab) {
+	image: ['fanjoy: 分享图片', function(info, tab) {
 		return 'shareImage("' + info.srcUrl + '");';
 	}],
-	link: ['有饭同享: 分享链接', function(info, tab) {
+	link: ['fanjoy: 分享链接', function(info, tab) {
 		return 'shareLink("' + info.linkUrl + '");';
 	}],
-	page: ['有饭同享: 分享页面', function(info, tab) {
+	page: ['fanjoy: 分享页面', function(info, tab) {
 		return 'shareSelection(true);';
 	}]
 };

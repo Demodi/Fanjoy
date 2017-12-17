@@ -112,9 +112,13 @@ inner.style.maxHeight = Fanjoy.defaultStyle.maxContentHeight + 'px';
 inputarea.addEventListener('input', onresize, false);
 inputarea.addEventListener('keyup', throttle(count, 100), false);
 inputarea.addEventListener('keydown', throttle(function(e) {
-	if (e.ctrlKey && e.keyCode === 13) {
-		button.click();
-	}
+	var modifierKey = e.metaKey || e.ctrlKey;
+	if (!modifierKey) return;
+	var keys = [e.metaKey, e.ctrlKey, e.shiftKey, e.altKey];
+	if (keys.filter(Boolean).length > 1) return;
+	if (e.keyCode !== 13) return;
+	e.preventDefault();
+	button.click();
 }, 100), false);
 wrapper.addEventListener('dblclick', submit, false);
 button.addEventListener('click', submit, false);
@@ -198,11 +202,7 @@ function adjustSizeForPic() {
 		inner.style.minHeight = min_height + 'px';
 		onresize();
 
-		if (data.img_data.type === 'image/png') {
-			fixTransparentPNG();
-		} else {
-			setPicTitle();
-		}
+		setPicTitle();
 	}
 	// 等待图片加载完毕
 	if (pic.complete) {
@@ -312,32 +312,6 @@ function setPicTitle() {
 	}
 }
 
-function fixTransparentPNG() {
-	Ripple.helpers.image2canvas(pic).
-	next(function(canvas) {
-		var ctx = canvas.getContext('2d');
-		var image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-		var pixel_array = image_data.data;
-		var m, a, s;
-		for (var i = 0, len = pixel_array.length; i < len; i += 4) {
-			a = pixel_array[i+3];
-			if (a === 255) continue;
-			s = 255 - a;
-			a /= 255;
-			m = 3;
-			while (m--) {
-				pixel_array[i+m] = pixel_array[i+m] * a + s;
-			}
-			pixel_array[i+3] = 255;
-		}
-		ctx.putImageData(image_data, 0, 0);
-		canvas.toBlob(function(blob) {
-			data.img_data = blob;
-			setPicTitle();
-		});
-	});
-}
-
 function submit() {
 	if (button.disabled) return;
 	if (! data.img_data && ! inputarea.textContent.length) return;
@@ -400,9 +374,12 @@ function shorten(links, force) {
 			}
 			if (! force) return;
 		}
-		var d = Ripple.shorten['is.gd'](link).hold(log).
-			next(function(short_url) {
-				setContent(inputarea.textContent.replace(link, short_url));
+		var d = Ripple.shorten['t.cn'](link).hold(log).
+			next(function(res) {
+				var short_url = res && res[0] && res[0].url_short;
+				if (short_url) {
+					setContent(inputarea.textContent.replace(link, short_url));
+				}
 			}).
 			error(function(e) {
 				if (e && ! e.status) {
@@ -447,7 +424,7 @@ function post() {
 			if (! img_data || ! e.lengthComputable) return;
 			var percent = Math.floor(e.loaded / e.total * 100);
 			progress_bar.style.width = percent + '%';
-			document.title = '有饭同享 (' + percent + '%)';
+			document.title = 'fanjoy (' + percent + '%)';
 
 			if (percent > 33 && percent <= 66)
 				progress.className = 'b';
@@ -458,7 +435,7 @@ function post() {
 		},
 		oncomplete: function() {
 			progress.style.display = 'none';
-			document.title = '有饭同享';
+			document.title = 'fanjoy';
 			ajax = null;
 		}
 	};
@@ -611,9 +588,6 @@ function onpasteImage(e) {
 	fr.addEventListener('load', function() {
 		data.img_url = pic.src = fr.result;
 		processImage();
-		if (f.type === 'image/png') {
-			fixTransparentPNG();
-		}
 	}, false);
 	fr.readAsDataURL(f);
 }
@@ -781,56 +755,6 @@ w.addEventListener('resize', onresize, false);
 setInterval(onresize, 250);
 
 w.addEventListener('paste', onpasteImage, false);
-
-w.addEventListener('paste', function (e) {
-	if (! /text\/html/.test(e.clipboardData.types)) return;
-	e.preventDefault();
-
-	var div = document.createElement('div');
-	div.innerHTML = e.clipboardData.getData('text/html');
-	var text = div.textContent.clear();
-
-	var selection = w.getSelection();
-	var node = selection.focusNode;
-
-	if (! node || ! inputarea.contains(node)) return;
-
-	if (selection.toString().length) {
-		selection.deleteFromDocument();
-		if (! inputarea.textContent.length) {
-			inputarea.innerHTML = '';
-			inputarea.appendChild(document.createTextNode(''));
-			select(0, 0);
-		}
-		selection = w.getSelection();
-		node = selection.focusNode;
-	}
-
-	var offset = selection.focusOffset;
-	var origin = node.textContent;
-
-	if (! inputarea.childNodes.length) {
-		inputarea.textContent = text;
-	} else {
-		node.textContent = origin.substring(0, offset) + text + origin.substring(offset);
-		node = node.childNodes[0] || node;
-	}
-
-	onresize();
-	count();
-
-	if (node === inputarea) {
-		node = inputarea.childNodes[0];
-	}
-
-	var range = document.createRange();
-	var pos = offset + text.length;
-	range.setStart(node, pos);
-	range.setEnd(node, pos);
-
-	selection.removeAllRanges();
-	selection.addRange(range);
-}, false);
 
 w.addEventListener('unload', function() {
 	ajax && ajax.cancel();

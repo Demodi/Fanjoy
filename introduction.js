@@ -40,11 +40,11 @@ function shareMessage(e, msg) {
 }
 
 $('feedback').addEventListener('click', function(e) {
-	shareMessage(e, '@锐风 我发现了有饭同享的一个问题:');
+	shareMessage(e, '@锐风 我发现了fanjoy的一个问题:');
 }, false);
 
 $('recommend').addEventListener('click', function(e) {
-	shareMessage(e, '我正在用 @锐风 开发的有饭同享, 很赞的 Chrome 扩展! 分享网页/图片非常方便! http://is.gd/fanjoy');
+	shareMessage(e, '我正在用 @锐风 开发的fanjoy, 很赞的 Chrome 扩展! 分享网页/图片非常方便! http://is.gd/fanjoy');
 }, false);
 
 if (! is_windows) {
